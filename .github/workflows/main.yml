@@ -1,26 +1,25 @@
 name: CI 
 on: [push, pull_request] 
 jobs: 
-without_env: 
-runs-on: ubuntu-latest 
+ without_env: 
+  runs-on: ubuntu-latest
+  steps:
+   - name: Echo MY_FAV_COLOR 
+     run: echo "MY_FAV_COLOR is ${{ vars.MY_FAV_COLOR }}" 
  
-    steps: 
-      - name: Echo MY_FAV_COLOR 
-        run: echo "MY_FAV_COLOR is ${{ vars.MY_FAV_COLOR }}" 
+   - name: Echo Show MY_SECRET 
+     run: echo "MY_SECRET is ${{ secrets.MY_SECRET }}" 
  
-      - name: Echo Show MY_SECRET 
-        run: echo "MY_SECRET is ${{ secrets.MY_SECRET }}" 
+ with_env: 
+   runs-on: ubuntu-latest 
  
-  with_env: 
-    runs-on: ubuntu-latest 
+   environment: 
+    name: dev 
+    url: https://example.com 
  
-    environment: 
-      name: dev 
-      url: https://example.com 
+   steps: 
+     - name: Echo MY_FAV_COLOR 
+       run: echo "MY_FAV_COLOR is ${{ vars.MY_FAV_COLOR }}" 
  
-    steps: 
-      - name: Echo MY_FAV_COLOR 
-        run: echo "MY_FAV_COLOR is ${{ vars.MY_FAV_COLOR }}" 
- 
-      - name: Echo Show MY_SECRET 
-        run: echo "MY_SECRET is ${{ secrets.MY_SECRET }}" 
+     - name: Echo Show MY_SECRET 
+       run: echo "MY_SECRET is ${{ secrets.MY_SECRET }}" 
