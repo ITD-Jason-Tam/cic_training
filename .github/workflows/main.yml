@@ -1,25 +1,85 @@
-name: CI 
-on: [push, pull_request] 
-jobs: 
- without_env: 
-  runs-on: ubuntu-latest
-  steps:
-   - name: Echo MY_FAV_COLOR 
-     run: echo "MY_FAV_COLOR is ${{ vars.MY_FAV_COLOR }}" 
- 
-   - name: Echo Show MY_SECRET 
-     run: echo "MY_SECRET is ${{ secrets.MY_SECRET }}" 
- 
- with_env: 
-   runs-on: ubuntu-latest 
- 
-   environment: 
-    name: dev 
-    url: https://example.com 
- 
-   steps: 
-     - name: Echo MY_FAV_COLOR 
-       run: echo "MY_FAV_COLOR is ${{ vars.MY_FAV_COLOR }}" 
- 
-     - name: Echo Show MY_SECRET 
-       run: echo "MY_SECRET is ${{ secrets.MY_SECRET }}" 
+name: Demo build pipelines
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_docker:
+    name: Build docker image
+
+    permissions:
+      contents: read
+      packages: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get the image name
+        id: image_name
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> ${GITHUB_ENV}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=true
+          tags: |
+            type=edge
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
+            type=sha,format=long
+
+      - name: Build and push Docker image
+        id: docker_build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          # platforms: linux/amd64,linux/arm64
+          push: true
+          pull: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Vulnerability scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}
+          output: "trivy.txt"
+          ignore-unfixed: true
+
+      - name: Publish Trivy Output to Summary
+        run: |
+          if [[ -s trivy.txt ]]; then
+            {
+              echo "### Security Output"
+              echo "<details><summary>Click to expand</summary>"
+              echo ""
+              echo '```terraform'
+              cat trivy.txt
+              echo '```'
+              echo "</details>"
+            } >> $GITHUB_STEP_SUMMARY
+          fi
